@@ -1,24 +1,30 @@
 ﻿# Crm
 
-En liten webapp for kundebehandling (CRM). Dette er løsningsforslaget til DI-oppgaven (1C) i Modul 1. API-et gjør det samme som i `crm-1-di-start`, men alle endepunktene får nå tjenestene sine fra DI-containeren. Kunder og aktiviteter kan lagres i JSON, XML eller i minnet, og du bytter lagring ved å endre én linje i `Program.cs`.
+En liten webapp for kundebehandling (CRM). Dette er startpunktet for databasemodulen (Modul 2). Appen er den samme som løsningsforslaget til DI-oppgaven: kunder og aktiviteter kan lagres i JSON, XML eller i minnet. Oppsettet for Entity Framework Core (EF) mot SQL Server er på plass. Oppgaven står i Canvas.
 
 ## Hva den gjør
 
 - **Kunder:** liste med søk og statusfilter, detaljside, opprett, endre og slett.
 - **Aktiviteter:** registrer møter, samtaler, e-poster og oppgaver for en kunde, merk dem som ferdige, og se alle åpne aktiviteter i én oversikt. Forfalte aktiviteter er markert.
 - **API (JSON):** alle endepunktene under `/api`, som beskrevet under.
-- **Dependency injection (DI):** `ICustomerService` og `IActivityService` er registrert, og alle endepunktene får dem som parameter. Ingen endepunkter lager tjenestene selv med `new`.
+- **Dependency injection (DI):** `ICustomerService` og `IActivityService` er registrert, og alle endepunktene får dem som parameter.
+- **Database:** oppsettet for EF er på plass, men selve databasen er ikke laget ennå.
 
 ## Krav
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - Visual Studio (en nyere versjon, som støtter `.http`-filer), eller en annen editor sammen med kommandolinjeverktøyet `dotnet`
+- SQL Server LocalDB, som installeres sammen med Visual Studio (arbeidsmengden **ASP.NET and web development** eller **Data storage and processing**)
+- [SQL Server Management Studio (SSMS)](https://learn.microsoft.com/sql/ssms/download-sql-server-management-studio-ssms)
 
 Sjekk at installasjonen fungerer:
 
 ```
 dotnet --version
+sqllocaldb info
 ```
+
+`sqllocaldb info` skal vise `MSSQLLocalDB`.
 
 ## Lag din egen kopi
 
@@ -94,26 +100,16 @@ Endepunktene under `/api` returnerer data som JSON, ikke HTML.
 
 Alle kallene skal gi de samme statuskodene og svarene uansett hvilken implementasjon som er registrert.
 
-## DI i dette repoet
+## Databasen i dette repoet
 
-### Endret siden `crm-1-di-start`
+### Oppsett
 
-- `CustomerService` har fått nytt navn: `JsonCustomerService`.
-- `ActivityService` har fått nytt navn: `JsonActivityService`, og implementerer det nye interfacet `IActivityService`.
-- Nye implementasjoner: `InMemoryCustomerService`, `XmlCustomerService`, `InMemoryActivityService` og `XmlActivityService`.
-- Alle endepunktene i `Program.cs`, både HTML-sidene og API-et, får `ICustomerService` og `IActivityService` som parameter i stedet for å lage tjenestene med `new`.
-- `activities.xml` følges ikke av Git.
+- **Pakkene** `Microsoft.EntityFrameworkCore.SqlServer` og `Microsoft.EntityFrameworkCore.Tools` (versjon `10.*`) står i `Crm.csproj`.
+- **Tilkoblingsstrengen** `Crm` står i `appsettings.json` og peker på databasen `Crm` i LocalDB.
+- **`Data/CrmDbContext.cs`** beskriver tabellene `Customers` og `Activities`, med en fremmednøkkel fra `Activities.CustomerId` til `Customers.Id`. Sletter du en kunde, slettes aktivitetene til kunden også.
+- **`Program.cs`** registrerer `CrmDbContext` med `AddDbContext`.
 
-### Tre implementasjoner bak hvert interface
-
-| Interface | Implementasjon | Lagring | Registrering |
-|---|---|---|---|
-| `ICustomerService` | `JsonCustomerService` | `customers.json` | `AddScoped` |
-| | `XmlCustomerService` | `customers.xml` | `AddScoped` |
-| | `InMemoryCustomerService` | Liste i minnet, med de fem eksempelkundene | `AddSingleton` |
-| `IActivityService` | `JsonActivityService` | `activities.json` | `AddScoped` |
-| | `XmlActivityService` | `activities.xml` | `AddScoped` |
-| | `InMemoryActivityService` | Liste i minnet, starter tom | `AddSingleton` |
+Appen bruker fortsatt JSON-filene. `CrmDbContext` registreres, men lages ikke før noe ber om den, så appen kjører også før databasen finnes.
 
 ### Bytt implementasjon
 
@@ -125,16 +121,19 @@ builder.Services.AddScoped<ICustomerService, JsonCustomerService>();
 //builder.Services.AddSingleton<ICustomerService, InMemoryCustomerService>();
 ```
 
-Kunder og aktiviteter byttes hver for seg. Resten av koden er uendret, fordi endepunktene bare kjenner interfacet.
+### Koble til med SSMS
 
-### Hvorfor `AddSingleton` for versjonene i minnet?
+- **Server name:** `(localdb)\MSSQLLocalDB`
+- **Authentication:** Windows Authentication
 
-Med `AddScoped` lages en ny instans for hvert kall. Listen i minnet starter da på nytt hver gang, og en kunde du nettopp opprettet er borte i neste kall. Med `AddSingleton` lever instansen like lenge som appen. Fil-versjonene leser filen for hvert kall og virker med begge.
+Databasen `Crm` vises under **Databases** etter `Update-Database`.
 
 ## Prosjektstruktur
 
 ```
 Program.cs          Endepunkter, hjelpefunksjoner og registrering av tjenester (DI)
+appsettings.json    Tilkoblingsstrengen til databasen
+Data/               CrmDbContext: tabellene og koblingen mellom dem
 Models/             Customer og Activity
 Services/           ICustomerService og IActivityService, med JSON-, XML- og minneimplementasjoner
 Templates/          HTML-maler med {{placeholders}}
@@ -143,23 +142,38 @@ customers.json      Eksempelkunder i JSON-format (appen endrer denne filen)
 customers.xml       Eksempelkunder i XML-format (appen endrer denne filen)
 Crm.http            De tre første kallene fra API-videoen
 Assignment.http     Alle kallene som tester API-et. Skal gi samme svar med alle implementasjonene
-Log.md              Logg og designnotater
-TestResults.md      Resultatene fra kallene i Assignment.http
+Log.md              Logg og designnotater som du fører underveis (del av leveransen)
+TestResults.md      Resultatene fra kallene i Assignment.http (del av leveransen)
 ```
+
+Mappen `Migrations` lages når du kjører `Add-Migration`. Den skal committes.
 
 ## Data
 
-- `customers.json` og `customers.xml` inneholder fem eksempelkunder. Appen skriver til filen som hører til den registrerte implementasjonen, så den vises som endret i Git. Slik gjenoppretter du eksempeldataene:
+- `customers.json` og `customers.xml` inneholder fem eksempelkunder. Appen skriver til filen som hører til den registrerte implementasjonen. Slik gjenoppretter du eksempeldataene:
 
 ```
 git checkout customers.json
 git checkout customers.xml
 ```
 
-- `activities.json` og `activities.xml` opprettes første gang du legger til en aktivitet med JSON- eller XML-versjonen. De følges ikke av Git. Slett filen for å fjerne alle aktiviteter.
+- `activities.json` og `activities.xml` opprettes første gang du legger til en aktivitet med JSON- eller XML-versjonen. De følges ikke av Git.
 - Versjonene i minnet nullstilles hver gang appen startes på nytt.
+- Databasen ligger i LocalDB, utenfor prosjektmappen, og følges ikke av Git. Slik sletter du den og lager den på nytt, tom:
 
-Nullstill dataene før du kjører hele `Assignment.http` på nytt. Standardverdiene for variablene øverst i filen stemmer bare med ferske data.
+```
+Drop-Database
+Update-Database
+```
+
+Nullstill dataene før du kjører hele `Assignment.http` på nytt. Standardverdiene for variablene øverst i filen stemmer bare med ferske data, med kunde 1–5.
+
+## Logg og testresultater
+
+Repoet inneholder to filer som du fyller ut underveis. Begge er en del av leveransen, sammen med koden og `Assignment.http`.
+
+- **`Log.md`:** før logg mens du jobber med oppgaven: feil du møter, og korte designnotater om valg du tar. Malene ligger i filen. Commit loggen sammen med koden.
+- **`TestResults.md`:** før inn statuskodene du faktisk får for hvert kall i `Assignment.http`.
 
 ## Feilsøking
 
@@ -168,8 +182,9 @@ Nullstill dataene før du kjører hele `Assignment.http` på nytt. Standardverdi
 | Feilen `NETSDK1004` (assets file not found) | Kjør `dotnet restore` i mappen med `Crm.csproj`, og bygg på nytt. |
 | Feil eller blank side rett etter oppstart | Appen er startet fra feil mappe. Start den fra mappen med `Crm.csproj`. |
 | Port 5080 er opptatt | Endre `applicationUrl` i `Properties/launchSettings.json`, og `@host` i `.http`-filene. |
-| `Send request` vises ikke over kallene i `.http`-filene | Filen må ha endelsen `.http`, og Visual Studio må være en nyere versjon. |
-| Dataene ser rare ut etter eksperimentering | Gjenopprett `customers.json` og `customers.xml`, og slett `activities.json` og `activities.xml`. |
+| NuGet prøver å installere versjon 11 av EF-pakkene | Prosjektet bruker .NET 10. Velg nyeste 10.x, eller bruk `Version="10.*"` i `Crm.csproj`. |
+| `Add-Migration` finner ikke `CrmDbContext` | `AddDbContext` mangler i `Program.cs`, eller prosjektet bygger ikke. Bygg og prøv igjen. |
+| `Cannot open database "Crm"` | Databasen finnes ikke ennå. Kjør `Update-Database`. |
 | Appen feiler med at en tjeneste ikke kan løses | Interfacet er ikke registrert med `builder.Services` i `Program.cs`, eller ingen linje for det interfacet er aktiv. |
 | En kunde eller aktivitet forsvinner rett etter at den er opprettet | Versjonen i minnet er registrert med `AddScoped`. Bruk `AddSingleton`. |
 | Et kall i `Assignment.http` gir 404 for en id som skulle finnes | Variablene øverst i filen peker på feil id, eller dataene er ikke nullstilt. |
