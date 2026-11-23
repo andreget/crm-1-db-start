@@ -1,19 +1,23 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
 using Crm.Models;
 using Crm.Services;
+using Crm.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddDbContext<CrmDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("Crm")));
+
 // Customers: choose one implementation
-//builder.Services.AddScoped<ICustomerService, JsonCustomerService>();
+builder.Services.AddScoped<ICustomerService, JsonCustomerService>();
 //builder.Services.AddScoped<ICustomerService, XmlCustomerService>();
-builder.Services.AddSingleton<ICustomerService, InMemoryCustomerService>(); // Singleton: the list must live as long as the app
+//builder.Services.AddSingleton<ICustomerService, InMemoryCustomerService>(); // Singleton: the list must live as long as the app
 
 // Activities: choose one implementation
-//builder.Services.AddScoped<IActivityService, JsonActivityService>();
+builder.Services.AddScoped<IActivityService, JsonActivityService>();
 //builder.Services.AddScoped<IActivityService, XmlActivityService>();
-builder.Services.AddSingleton<IActivityService, InMemoryActivityService>();
+//builder.Services.AddSingleton<IActivityService, InMemoryActivityService>();
 
 var app = builder.Build();
 
